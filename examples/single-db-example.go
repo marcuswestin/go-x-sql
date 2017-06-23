@@ -20,7 +20,7 @@ var (
 )
 
 func Connect() (err error) {
-	db, err = sql.Connect(Driver, DataSourceString)
+	db, err = sql.Connect(Driver, DataSourceString, sql.DbNameConventionCamelCase_uncapitalized)
 	return
 }
 func MustConnect() {

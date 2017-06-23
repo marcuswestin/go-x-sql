@@ -10,7 +10,6 @@ import (
 
 type Db interface {
 	API
-	SetColumnNameMapperFn(ColumnNameMapperFn)
 	Transact(TxFn) error
 }
 type API interface {
@@ -31,20 +30,19 @@ type Tx interface {
 	API
 }
 
-// ColumnNameMapperFn is a function that takes a database column name and
-// returns its corresponding golang struct field name. The default column
-// mapper function is ColumnNameMapperSame
-type ColumnNameMapperFn func(dbColumnName string) (structFieldName string)
+// DbNameConventionMapper is a function that takes a go struct field name and
+// returns its corresponding database column name.
+type DbNameConventionMapper func(goCamelCaseName string) (dbColumnName string)
 
 // Connect
 //////////
 
-func Connect(driverName, dataSourceString string) (Db, error) {
-	return connect(driverName, dataSourceString)
+func Connect(driverName, dataSourceString string, dbNamesMapper DbNameConventionMapper) (Db, error) {
+	return connect(driverName, dataSourceString, dbNamesMapper)
 }
 
-func MustConnect(driverName, dataSourceString string) Db {
-	return mustConnect(driverName, dataSourceString)
+func MustConnect(driverName, dataSourceString string, dbNamesMapper DbNameConventionMapper) Db {
+	return mustConnect(driverName, dataSourceString, dbNamesMapper)
 }
 
 // Errors
@@ -59,9 +57,11 @@ var (
 //////////////////////
 
 var (
-	ColumnNameMapperSame                  = func(col string) string { return col }
-	ColumnNameMapperUnderscoreToCamelCase = func(col string) string { return underscoreToCamelCase(col) }
-	ColumnNameMapperCapitalize            = func(col string) string { return capitalizeString(col) }
+	DbNameConventionCamelCase_Capitalized   = func(str string) string { return str }
+	DbNameConventionCamelCase_uncapitalized = func(str string) string { return uncapitalize(str) }
+	DbNameConvention_under_score            = func(str string) string { return camelCaseTo_under_score(str) }
+	DbNameConventionUPPERCASE               = func(str string) string { return toUPPERCASE(str) }
+	DbNameConventionUPPER_CASE_UNDER_SCORE  = func(str string) string { return toUPPERCASE(camelCaseTo_under_score(str)) }
 )
 
 // Misc

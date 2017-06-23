@@ -18,7 +18,7 @@ var testDb = "goxsqltestdb"
 
 func TestInsertAndTest(t *testing.T) {
 	var err error
-	db := sql.MustConnect("mysql", "root:@/")
+	db := sql.MustConnect("mysql", "root:@/", sql.DbNameConventionCamelCase_Capitalized)
 
 	db.MustExec("DROP DATABASE IF EXISTS " + testDb)
 	defer db.MustExec("DROP DATABASE " + testDb)

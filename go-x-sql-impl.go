@@ -3,8 +3,11 @@ package sql
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"runtime/debug"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -27,14 +30,14 @@ type sqlxAPI interface {
 // Connect
 //////////
 
-func mustConnect(driverName, dataSourceString string) Db {
-	db, err := Connect(driverName, dataSourceString)
+func mustConnect(driverName, dataSourceString string, dbNamesMapper DbNameConventionMapper) Db {
+	db, err := connect(driverName, dataSourceString, dbNamesMapper)
 	if err != nil {
 		panic(err)
 	}
 	return db
 }
-func connect(driverName, dataSourceString string) (Db, error) {
+func connect(driverName, dataSourceString string, dbNamesMapper DbNameConventionMapper) (Db, error) {
 	sqlxAPI, err := sqlx.Open(driverName, dataSourceString)
 	if err != nil {
 		return nil, err
@@ -42,7 +45,7 @@ func connect(driverName, dataSourceString string) (Db, error) {
 	if err := sqlxAPI.Ping(); err != nil {
 		return nil, errors.New("Connect error: could not ping database (" + err.Error() + ")")
 	}
-	sqlxAPI.MapperFunc(ColumnNameMapperSame)
+	sqlxAPI.MapperFunc(dbNamesMapper)
 	// sqlxAPI = sqlxAPI.Unsafe()
 	return &db{sqlxAPI, api{sqlxAPI}}, nil
 }
@@ -137,10 +140,6 @@ func (api *api) MustExec(query string, args ...interface{}) {
 // Top-level Db API: Column mapper & transactions
 /////////////////////////////////////////////////
 
-func (db *db) SetColumnNameMapperFn(mapperFn ColumnNameMapperFn) {
-	db.sqlxDb.MapperFunc(mapperFn)
-}
-
 func (db *db) Transact(txFunc TxFn) error {
 	txConn, err := db.sqlxDb.Beginx()
 	if err != nil {
@@ -210,16 +209,23 @@ func txError(title string, txErr error, commitErr error, rbErr error) error {
 		"\n	Stack trace: " + string(debug.Stack()))
 }
 
-func underscoreToCamelCase(under_scored_string string) (camelCasedString string) {
-	// from https://github.com/asaskevich/govalidator/blob/master/utils.go#L101
-	return strings.Replace(
-		strings.Title(
-			strings.Replace(
-				strings.ToLower(under_scored_string),
-				"_", " ", -1)),
-		" ", "", -1)
+var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+
+func camelCaseTo_under_score(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
 }
 
-func capitalizeString(lowercaseString string) (CapitalizedString string) {
-	return strings.Title(lowercaseString)
+func toUPPERCASE(str string) string {
+	return strings.ToUpper(str)
+}
+
+func uncapitalize(str string) string {
+	if str == "" {
+		return ""
+	}
+	r, n := utf8.DecodeRuneInString(str)
+	return string(unicode.ToLower(r)) + str[n:]
 }
