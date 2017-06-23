@@ -131,10 +131,7 @@ func (api *api) Exec(query string, args ...interface{}) error {
 	return err
 }
 func (api *api) MustExec(query string, args ...interface{}) {
-	err := api.Exec(query, args...)
-	if err != nil {
-		panic(err)
-	}
+	Must(api.Exec(query, args...))
 }
 
 // Top-level Db API: Column mapper & transactions
@@ -178,6 +175,35 @@ func (db *db) Transact(txFunc TxFn) error {
 	}
 
 	// All done!
+	return nil
+}
+
+// Checks
+/////////
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+func mustInt(i int64, err error) int64 {
+	if err != nil {
+		panic(err)
+	}
+	return i
+}
+func mustBool(b bool, err error) bool {
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func checkDest(dest interface{}) error {
+	if _, isString := dest.(string); isString {
+		return errors.New("Destination is string")
+	}
+	// TODO: Check that it's a pointer type?
 	return nil
 }
 

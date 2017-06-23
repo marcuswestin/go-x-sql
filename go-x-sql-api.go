@@ -53,6 +53,14 @@ var (
 	ErrRowsAffected = errors.New("Affected unexpected number of rows")
 )
 
+var (
+	Must     = must
+	MustInt  = mustInt
+	MustBool = mustBool
+
+	CheckDest = checkDest
+)
+
 // Column name mappers
 //////////////////////
 
