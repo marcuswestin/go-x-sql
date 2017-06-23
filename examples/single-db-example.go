@@ -2,21 +2,23 @@ package db
 
 // This package would be used like this:
 //
-//	import ( _ "github.com/go-sql-driver/mysql" )
-// 	...
 // 	db.Driver = "mysql"
 // 	db.Driver = "root:@/"
-// 	db.MustConnect()
-// 	db.MustExec("Create Table Foo ();")
+// 	db.Setup()
+// 	db.Exec("Create Table Foo ();")
 
 import (
+	_ "github.com/go-sql-driver/mysql"
+	// _ "github.com/lib/pq"
 	sql "github.com/marcuswestin/go-x-sql"
 )
 
 var (
-	Driver           = "mysql"
-	DataSourceString = "root:@/"
 	db               sql.Db
+	driver           = "mysql"
+	dataSourceString = "root:@/"
+	// driver           = "postgres"
+	// dataSourceString = "postgres://root@localhost/pqgotest?sslmode=disable&port=5432"
 )
 
 func Connect() (err error) {
