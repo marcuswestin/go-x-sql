@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
+
 	sql "github.com/marcuswestin/go-x-sql"
 )
 
@@ -16,7 +18,43 @@ type Person struct {
 
 var testDb = "goxsqltestdb"
 
-func TestInsertAndTest(t *testing.T) {
+func TestCockroachDB(t *testing.T) {
+	var err error
+	db := sql.MustConnect("postgres", "postgres://root@localhost/?sslmode=disable&port=5432", sql.DbNameConvention_under_score)
+
+	db.MustExec("DROP DATABASE IF EXISTS " + testDb)
+	defer db.MustExec("DROP DATABASE " + testDb)
+	db.MustExec("CREATE DATABASE " + testDb)
+	db.MustExec("SET database= " + testDb)
+	db.MustExec(`CREATE TABLE Person (
+		id SERIAL,
+		first_name STRING(255),
+		last_name STRING(255),
+		age INT,
+		PRIMARY KEY (id)
+	);`)
+
+	firstName := "Marcus"
+	lastName := "Westin"
+	age := 31
+	// TODO Use RETURNING Id to get Id: https://www.cockroachlabs.com/docs/insert.html#go
+	err = db.InsertIgnoreId("INSERT INTO person (first_name, last_name, age) VALUES ($1, $2, $3)", firstName, lastName, age)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var person Person = Person{}
+	err = db.SelectOne(&person, "SELECT * FROM person WHERE first_name=$1", firstName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if person.FirstName != firstName || person.LastName != lastName || person.Age != age {
+		t.Fatal("Selected row don't match expected values", person, firstName, lastName, age)
+	}
+}
+
+func TestMysql(t *testing.T) {
 	var err error
 	db := sql.MustConnect("mysql", "root:@/", sql.DbNameConventionCamelCase_Capitalized)
 
