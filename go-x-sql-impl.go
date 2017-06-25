@@ -17,7 +17,8 @@ type db struct {
 	api
 }
 type api struct {
-	sqlxAPI sqlxAPI
+	sqlxAPI  sqlxAPI
+	bindType int
 }
 
 type sqlxAPI interface {
@@ -47,21 +48,24 @@ func connect(driverName, dataSourceString string, dbNamesMapper DbNameConvention
 	}
 	sqlxAPI.MapperFunc(dbNamesMapper)
 	// sqlxAPI = sqlxAPI.Unsafe()
-	return &db{sqlxAPI, api{sqlxAPI}}, nil
+	return &db{sqlxAPI, api{sqlxAPI, sqlx.BindType(driverName)}}, nil
 }
 
 // Selects
 //////////
 
 func (api *api) Select(dest interface{}, query string, args ...interface{}) error {
+	query = fixQuery(api, query)
 	return api.sqlxAPI.Select(dest, query, args...)
 }
 
 func (api *api) SelectOne(dest interface{}, query string, args ...interface{}) error {
+	query = fixQuery(api, query)
 	return api.sqlxAPI.Get(dest, query, args...)
 }
 
 func (api *api) SelectOneMaybe(dest interface{}, query string, args ...interface{}) (bool, error) {
+	query = fixQuery(api, query)
 	err := api.sqlxAPI.Get(dest, query, args...)
 	if err == ErrNoRows {
 		return false, nil
@@ -76,6 +80,7 @@ func (api *api) SelectOneMaybe(dest interface{}, query string, args ...interface
 //////////
 
 func (api *api) Insert(query string, args ...interface{}) (id int64, err error) {
+	query = fixQuery(api, query)
 	res, err := api.sqlxAPI.Exec(query, args...)
 	if err != nil {
 		return
@@ -105,6 +110,7 @@ func (api *api) InsertIgnoreDuplicate(query string, args ...interface{}) (bool, 
 //////////
 
 func (api *api) Update(query string, args ...interface{}) (rowsAffected int64, err error) {
+	query = fixQuery(api, query)
 	res, err := api.sqlxAPI.Exec(query, args...)
 	if err != nil {
 		return 0, err
@@ -113,10 +119,12 @@ func (api *api) Update(query string, args ...interface{}) (rowsAffected int64, e
 }
 
 func (api *api) UpdateOne(query string, args ...interface{}) error {
+	query = fixQuery(api, query)
 	return api.UpdateNum(1, query, args...)
 }
 
 func (api *api) UpdateNum(expectedRowsAffected int64, query string, args ...interface{}) error {
+	query = fixQuery(api, query)
 	rowsAffected, err := api.Update(query, args...)
 	if err != nil {
 		return err
@@ -131,10 +139,12 @@ func (api *api) UpdateNum(expectedRowsAffected int64, query string, args ...inte
 ///////
 
 func (api *api) Exec(query string, args ...interface{}) error {
+	query = fixQuery(api, query)
 	_, err := api.sqlxAPI.Exec(query, args...)
 	return err
 }
 func (api *api) MustExec(query string, args ...interface{}) {
+	query = fixQuery(api, query)
 	Must(api.Exec(query, args...))
 }
 
@@ -163,7 +173,7 @@ func (db *db) Transact(txFunc TxFn) error {
 
 	// Execution transaction function.
 	// Rollback on error, Commit otherwise.
-	txErr := txFunc(&api{txConn})
+	txErr := txFunc(&api{txConn, db.api.bindType})
 	if txErr != nil {
 		rbErr := txConn.Rollback()
 		if rbErr != nil {
@@ -213,6 +223,10 @@ func checkDest(dest interface{}) error {
 
 // Util
 ///////
+
+func fixQuery(api *api, query string) string {
+	return sqlx.Rebind(api.bindType, query)
+}
 
 func isDuplicateEntryError(err error) bool {
 	return err != nil && (false ||

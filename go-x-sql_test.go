@@ -38,13 +38,13 @@ func TestCockroachDB(t *testing.T) {
 	lastName := "Westin"
 	age := 31
 	// TODO Use RETURNING Id to get Id: https://www.cockroachlabs.com/docs/insert.html#go
-	err = db.InsertIgnoreId("INSERT INTO person (first_name, last_name, age) VALUES ($1, $2, $3)", firstName, lastName, age)
+	err = db.InsertIgnoreId("INSERT INTO person (first_name, last_name, age) VALUES (?, ?, ?)", firstName, lastName, age)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var person Person = Person{}
-	err = db.SelectOne(&person, "SELECT * FROM person WHERE first_name=$1", firstName)
+	err = db.SelectOne(&person, "SELECT * FROM person WHERE first_name=?", firstName)
 	if err != nil {
 		t.Fatal(err)
 	}

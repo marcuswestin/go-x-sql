@@ -4,7 +4,7 @@ Improved sql package for go
 ## TODO
 
 - Abstract out mysql/cockroachdb/pg differences
-    + Setting to replace `?, ?, ?` with `$1, $2, $3` for postgres/cockroachdb
+    + X Setting to replace `?, ?, ?` with `$1, $2, $3` for postgres/cockroachdb
     + Use RETURNING Id to get Id from cockroachdb: https://www.cockroachlabs.com/docs/insert.html#go
     + Improve error handling: see http://go-database-sql.org/errors.html#identifying-specific-database-errors (and use https://github.com/VividCortex/mysqlerr for mysql errors, and pg for pg errors)
     + Allow for `INSERT INTO SET col1=?, col2=? in pg/cockroachdb`
