@@ -18,7 +18,7 @@ type API interface {
 	SelectOneMaybe(dest interface{}, query string, args ...interface{}) (bool, error)
 	Insert(query string, args ...interface{}) (id int64, err error)
 	InsertIgnoreId(query string, args ...interface{}) error
-	InsertIgnoreDuplicate(query string, args ...interface{}) error
+	InsertIgnoreDuplicate(query string, args ...interface{}) (bool, error)
 	Update(query string, args ...interface{}) (rowsAffected int64, err error)
 	UpdateOne(query string, args ...interface{}) error
 	UpdateNum(expectedRowsAffected int64, query string, args ...interface{}) error

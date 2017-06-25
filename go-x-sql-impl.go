@@ -84,16 +84,20 @@ func (api *api) Insert(query string, args ...interface{}) (id int64, err error) 
 }
 
 func (api *api) InsertIgnoreId(query string, args ...interface{}) error {
+	query = fixQuery(api, query)
 	_, err := api.sqlxAPI.Exec(query, args...)
 	return err
 }
 
-func (api *api) InsertIgnoreDuplicate(query string, args ...interface{}) error {
+func (api *api) InsertIgnoreDuplicate(query string, args ...interface{}) (bool, error) {
+	query = fixQuery(api, query)
 	err := api.InsertIgnoreId(query, args...)
-	if err == nil || IsDuplicateEntryError(err) {
-		return nil
+	if err == nil {
+		return false, nil
+	} else if IsDuplicateEntryError(err) {
+		return true, nil
 	} else {
-		return err
+		return false, err
 	}
 }
 
@@ -215,6 +219,7 @@ func isDuplicateEntryError(err error) bool {
 		// mysql:
 		strings.Contains(err.Error(), "Duplicate entry") ||
 		// cockroachdb:
+		strings.Contains(err.Error(), "duplicate key value") ||
 		// ???
 		false)
 }

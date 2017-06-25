@@ -43,8 +43,8 @@ func Insert(query string, args ...interface{}) (id int64) {
 func InsertIgnoreId(query string, args ...interface{}) {
 	sql.Must(db.InsertIgnoreId(query, args...))
 }
-func InsertIgnoreDuplicate(query string, args ...interface{}) {
-	sql.Must(db.InsertIgnoreDuplicate(query, args...))
+func InsertIgnoreDuplicate(query string, args ...interface{}) bool {
+	sql.MustBool(db.InsertIgnoreDuplicate(query, args...))
 }
 func Update(query string, args ...interface{}) (rowsAffected int64) {
 	return sql.MustInt(db.Update(query, args...))
