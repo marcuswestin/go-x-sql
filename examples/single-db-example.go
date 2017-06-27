@@ -38,8 +38,8 @@ func SelectOne(dest interface{}, query string, args ...interface{}) error {
 func SelectOneMaybe(dest interface{}, query string, args ...interface{}) (bool, error) {
 	return db.SelectOneMaybe(dest, query, args...)
 }
-func Insert(query string, args ...interface{}) (id int64, err error) {
-	return db.Insert(query, args...)
+func InsertAndGetId(query string, args ...interface{}) (id int64, err error) {
+	return db.InsertAndGetId(query, args...)
 }
 func InsertIgnoreId(query string, args ...interface{}) error {
 	return db.InsertIgnoreId(query, args...)

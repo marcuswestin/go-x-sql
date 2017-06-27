@@ -37,8 +37,8 @@ func SelectOneMaybe(dest interface{}, query string, args ...interface{}) bool {
 	sql.Must(sql.CheckDest(dest))
 	return sql.MustBool(db.SelectOneMaybe(dest, query, args...))
 }
-func Insert(query string, args ...interface{}) (id int64) {
-	return sql.MustInt(db.Insert(query, args...))
+func InsertAndGetId(query string, args ...interface{}) (id int64) {
+	return sql.MustInt(db.InsertAndGetId(query, args...))
 }
 func InsertIgnoreId(query string, args ...interface{}) {
 	sql.Must(db.InsertIgnoreId(query, args...))

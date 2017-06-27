@@ -10,7 +10,7 @@ import (
 )
 
 type Person struct {
-	Id        uint64
+	Id        int64
 	FirstName string
 	LastName  string
 	Age       int
@@ -34,24 +34,14 @@ func TestCockroachDB(t *testing.T) {
 		PRIMARY KEY (id)
 	);`)
 
-	firstName := "Marcus"
-	lastName := "Westin"
-	age := 31
-	// TODO Use RETURNING Id to get Id: https://www.cockroachlabs.com/docs/insert.html#go
-	err = db.InsertIgnoreId("INSERT INTO person (first_name, last_name, age) VALUES (?, ?, ?)", firstName, lastName, age)
+	expected := Person{0, "Marcus", "Westin", 31}
+	expected.Id, err = db.InsertAndGetId(`
+		INSERT INTO person (first_name, last_name, age) VALUES (?, ?, ?) RETURNING id`,
+		expected.FirstName, expected.LastName, expected.Age)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	var person Person = Person{}
-	err = db.SelectOne(&person, "SELECT * FROM person WHERE first_name=?", firstName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if person.FirstName != firstName || person.LastName != lastName || person.Age != age {
-		t.Fatal("Selected row don't match expected values", person, firstName, lastName, age)
-	}
+	checkValues(t, db, expected)
 }
 
 func TestMysql(t *testing.T) {
@@ -70,24 +60,33 @@ func TestMysql(t *testing.T) {
 		PRIMARY KEY (Id)
 	);`)
 
-	firstName := "Marcus"
-	lastName := "Westin"
-	age := 31
-	id, err := db.Insert("INSERT INTO Person SET FirstName=?, LastName=?, Age=?", firstName, lastName, age)
+	expected := Person{0, "Marcus", "Westin", 31}
+	expected.Id, err = db.InsertAndGetId(`
+		INSERT INTO Person SET FirstName=?, LastName=?, Age=?`,
+		expected.FirstName, expected.LastName, expected.Age)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != 1 {
-		t.Fatal("Expected Id to be 1:", id)
-	}
+	checkValues(t, db, expected)
+}
 
-	var person Person = Person{}
-	err = db.SelectOne(&person, "SELECT * FROM Person WHERE Id=?", id)
+func checkValues(t *testing.T, db sql.Db, expected Person) {
+	if expected.Id == 0 {
+		t.Fatal("Expected an ID")
+	}
+	expected.Age *= 2
+	err := db.UpdateOne(`UPDATE Person SET Age=?`, expected.Age)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if person.FirstName != firstName || person.LastName != lastName || person.Age != age {
-		t.Fatal("Selected row don't match expected values", person, firstName, lastName, age)
+	var person Person
+	err = db.SelectOne(&person, "SELECT * FROM person WHERE id=?", expected.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if person.FirstName != expected.FirstName || person.LastName != expected.LastName || person.Age != expected.Age {
+		t.Fatal("Selected row don't match expected values", person, expected)
 	}
 }

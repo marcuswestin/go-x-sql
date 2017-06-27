@@ -19,6 +19,7 @@ type db struct {
 type api struct {
 	sqlxAPI  sqlxAPI
 	bindType int
+	insertAndGetIdFn
 }
 
 type sqlxAPI interface {
@@ -48,7 +49,7 @@ func connect(driverName, dataSourceString string, dbNamesMapper DbNameConvention
 	}
 	sqlxAPI.MapperFunc(dbNamesMapper)
 	// sqlxAPI = sqlxAPI.Unsafe()
-	return &db{sqlxAPI, api{sqlxAPI, sqlx.BindType(driverName)}}, nil
+	return &db{sqlxAPI, api{sqlxAPI, sqlx.BindType(driverName), getInsertAndGetIdFnForDriver(driverName)}}, nil
 }
 
 // Selects
@@ -79,15 +80,6 @@ func (api *api) SelectOneMaybe(dest interface{}, query string, args ...interface
 // Inserts
 //////////
 
-func (api *api) Insert(query string, args ...interface{}) (id int64, err error) {
-	query = fixQuery(api, query)
-	res, err := api.sqlxAPI.Exec(query, args...)
-	if err != nil {
-		return
-	}
-	return res.LastInsertId()
-}
-
 func (api *api) InsertIgnoreId(query string, args ...interface{}) error {
 	query = fixQuery(api, query)
 	_, err := api.sqlxAPI.Exec(query, args...)
@@ -104,6 +96,37 @@ func (api *api) InsertIgnoreDuplicate(query string, args ...interface{}) (bool, 
 	} else {
 		return false, err
 	}
+}
+
+func (api *api) InsertAndGetId(query string, args ...interface{}) (id int64, err error) {
+	query = fixQuery(api, query)
+	return api.insertAndGetIdFn(api, query, args...)
+}
+
+type insertAndGetIdFn func(api *api, query string, args ...interface{}) (id int64, err error)
+
+func getInsertAndGetIdFnForDriver(driverName string) insertAndGetIdFn {
+	switch driverName {
+	case "postgres", "pgx":
+		return postgresInsertAndGetIdFn
+	case "mysql", "sqlite3":
+		return mysqlInsertAndGetIdFn
+	default:
+		panic("Unkown insert id function for driver " + driverName)
+	}
+}
+
+func mysqlInsertAndGetIdFn(api *api, query string, args ...interface{}) (id int64, err error) {
+	res, err := api.sqlxAPI.Exec(query, args...)
+	if err != nil {
+		return
+	}
+	return res.LastInsertId()
+}
+
+func postgresInsertAndGetIdFn(api *api, query string, args ...interface{}) (id int64, err error) {
+	err = api.sqlxAPI.Get(&id, query, args...)
+	return
 }
 
 // Updates
@@ -173,7 +196,7 @@ func (db *db) Transact(txFunc TxFn) error {
 
 	// Execution transaction function.
 	// Rollback on error, Commit otherwise.
-	txErr := txFunc(&api{txConn, db.api.bindType})
+	txErr := txFunc(&api{txConn, db.api.bindType, db.api.insertAndGetIdFn})
 	if txErr != nil {
 		rbErr := txConn.Rollback()
 		if rbErr != nil {
