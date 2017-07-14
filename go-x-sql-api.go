@@ -10,6 +10,7 @@ import (
 
 type Db interface {
 	API
+	SetDatabase(db string) error
 	Transact(TxFn) error
 }
 type API interface {

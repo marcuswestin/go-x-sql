@@ -15,6 +15,7 @@ import (
 type db struct {
 	sqlxDb *sqlx.DB
 	api
+	setDatabaseFn
 }
 type api struct {
 	sqlxAPI  sqlxAPI
@@ -49,7 +50,9 @@ func connect(driverName, dataSourceString string, dbNamesMapper DbNameConvention
 	}
 	sqlxAPI.MapperFunc(dbNamesMapper)
 	// sqlxAPI = sqlxAPI.Unsafe()
-	return &db{sqlxAPI, api{sqlxAPI, sqlx.BindType(driverName), getInsertAndGetIdFnForDriver(driverName)}}, nil
+	insertAndGetIdFn, setDatabaseFn := getDbSpecificFunctions(driverName)
+	api := api{sqlxAPI, sqlx.BindType(driverName), insertAndGetIdFn}
+	return &db{sqlxAPI, api, setDatabaseFn}, nil
 }
 
 // Selects
@@ -103,19 +106,24 @@ func (api *api) InsertAndGetId(query string, args ...interface{}) (id int64, err
 	return api.insertAndGetIdFn(api, query, args...)
 }
 
-type insertAndGetIdFn func(api *api, query string, args ...interface{}) (id int64, err error)
+// Database-specific functionality
+//////////////////////////////////
 
-func getInsertAndGetIdFnForDriver(driverName string) insertAndGetIdFn {
+type insertAndGetIdFn func(api *api, query string, args ...interface{}) (id int64, err error)
+type setDatabaseFn func(db *db, dbName string) error
+
+func getDbSpecificFunctions(driverName string) (insertAndGetIdFn, setDatabaseFn) {
 	switch driverName {
 	case "postgres", "pgx":
-		return postgresInsertAndGetIdFn
+		return postgresInsertAndGetIdFn, postgresSetDatabase
 	case "mysql", "sqlite3":
-		return mysqlInsertAndGetIdFn
+		return mysqlInsertAndGetIdFn, mysqlSetDatabase
 	default:
-		panic("Unkown insert id function for driver " + driverName)
+		panic("Unkown driver: " + driverName)
 	}
 }
 
+// Mysql-specific functionality
 func mysqlInsertAndGetIdFn(api *api, query string, args ...interface{}) (id int64, err error) {
 	res, err := api.sqlxAPI.Exec(query, args...)
 	if err != nil {
@@ -123,10 +131,19 @@ func mysqlInsertAndGetIdFn(api *api, query string, args ...interface{}) (id int6
 	}
 	return res.LastInsertId()
 }
+func mysqlSetDatabase(db *db, dbName string) error {
+	_, err := db.sqlxDb.Exec(`USE ` + dbName)
+	return err
+}
 
+// Postgres-specific functionality
 func postgresInsertAndGetIdFn(api *api, query string, args ...interface{}) (id int64, err error) {
 	err = api.sqlxAPI.Get(&id, query, args...)
 	return
+}
+func postgresSetDatabase(db *db, dbName string) error {
+	_, err := db.sqlxDb.Exec(`SET DATABASE = ` + dbName)
+	return err
 }
 
 // Updates
@@ -173,6 +190,10 @@ func (api *api) MustExec(query string, args ...interface{}) {
 
 // Top-level Db API: Column mapper & transactions
 /////////////////////////////////////////////////
+
+func (db *db) SetDatabase(dbName string) error {
+	return db.setDatabaseFn(db, dbName)
+}
 
 func (db *db) Transact(txFunc TxFn) error {
 	txConn, err := db.sqlxDb.Beginx()
